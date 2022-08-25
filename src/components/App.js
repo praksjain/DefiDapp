@@ -1,19 +1,61 @@
-import React, { Component } from 'react';
-import Web3 from 'web3';
-import Identicon from 'identicon.js';
-import './App.css';
-import Decentragram from '../abis/Decentragram.json'
+import React, { Component } from 'react'
+import Web3 from 'web3'
+import DaiToken from '../abis/DaiToken.json'
+import PrakToken from '../abis/PrakToken.json'
+import DigitalBank from '../abis/DigitalBank.json'
 import Navbar from './Navbar'
 import Main from './Main'
-
-const ipfsClient = require('ipfs-http-client')
-const ipfs = ipfsClient({ host: "ipfs.infura.io", port: 5001, protocol: "https" })
-
+import './App.css'
 
 class App extends Component {
+
   async componentWillMount() {
     await this.loadWeb3()
     await this.loadBlockchainData()
+  }
+
+  async loadBlockchainData() {
+    const web3 = window.web3
+
+    const accounts = await web3.eth.getAccounts()
+    this.setState({ account: accounts[0] })
+
+    const networkId = await web3.eth.net.getId()
+
+    // Load DaiToken
+    const daiTokenData = DaiToken.networks[networkId]
+    if (daiTokenData) {
+      const daiToken = new web3.eth.Contract(DaiToken.abi, daiTokenData.address)
+      this.setState({ daiToken })
+      let daiTokenBalance = await daiToken.methods.balanceOf(this.state.account).call()
+      this.setState({ daiTokenBalance: daiTokenBalance.toString() })
+    } else {
+      window.alert('DaiToken contract not deployed to detected network.')
+    }
+
+    // Load PrakToken
+    const prakTokenData = PrakToken.networks[networkId]
+    if (prakTokenData) {
+      const prakToken = new web3.eth.Contract(PrakToken.abi, prakTokenData.address)
+      this.setState({ prakToken })
+      let prakTokenBalance = await prakToken.methods.balanceOf(this.state.account).call()
+      this.setState({ prakTokenBalance: prakTokenBalance.toString() })
+    } else {
+      window.alert('PrakToken contract not deployed to detected network.')
+    }
+
+    // Load Digital Bank
+    const digitalBankData = DigitalBank.networks[networkId]
+    if (digitalBankData) {
+      const digitalBank = new web3.eth.Contract(DigitalBank.abi, digitalBankData.address)
+      this.setState({ digitalBank })
+      let stakeBalance = await digitalBank.methods.stakeBalance(this.state.account).call()
+      this.setState({ stakeBalance: stakeBalance.toString() })
+    } else {
+      window.alert('DigitalBank contract not deployed to detected network.')
+    }
+
+    this.setState({ loading: false })
   }
 
   async loadWeb3() {
@@ -25,97 +67,74 @@ class App extends Component {
       window.web3 = new Web3(window.web3.currentProvider)
     }
     else {
-      window.alert("Non-ethereum browser detected. Try MetaMask..!!")
+      window.alert('Non-Ethereum browser detected. You should consider trying MetaMask!')
     }
   }
 
-  async loadBlockchainData() {
-    const web3 = window.web3
-
-    // Fetch account details
-    const accounts = await web3.eth.getAccounts()
-    this.setState({ account: accounts[0] })
-
-    // Get Network ID
-    const networkId = await web3.eth.net.getId() // this will return 5777 from Ganache
-    const networkData = Decentragram.networks[networkId]
-    // Access Contract
-    if (networkData) {
-      const decentragram = web3.eth.Contract(Decentragram.abi, networkData.address)
-      this.setState({ decentragram: decentragram })
-      const imageCount = await decentragram.methods.imageCounter().call()
-      this.setState({ imageCount })
-
-      // Load Images
-      for (var i = 1; i < imageCount; i++) {
-        const image = await decentragram.methods.images(i).call()
-        this.setState({ images: [...this.state.images, image] })
-      }
-
-      // Sort images.. Highest tipped image on top
-      this.setState({ images: this.state.images.sort((a, b) => b.amount - a.amount) })
-      this.setState({ loading: false })
-    } else {
-      window.alert("Contract is not yet deployed..!!")
-    }
-  }
-  captureFile = event => {
-    event.preventDefault()
-    const file = event.target.files[0]
-    const reader = new window.FileReader()
-    reader.readAsArrayBuffer(file)
-
-    reader.onloadend = () => {
-      this.setState({ buffer: Buffer(reader.result) })
-      console.log("Buffer", this.state.buffer)
-    }
-  }
-
-  uploadImage = description => {
-    console.log("Submitting file to IPFS")
-    // Adding file to IPFS
-    ipfs.add(this.state.buffer, (error, result) => {
-      console.log("IPFS Result ", result)
-      if (error) {
-        console.log("Error", error)
-        return
-      }
-      this.setState({ loading: true })
-      this.state.decentragram.methods.uploadImage(result[0].hash, description).send({ from: this.state.account }).on("transactionHash", (hash) => {
+  stakeTokens = (amount) => {
+    this.setState({ loading: true })
+    this.state.daiToken.methods.approve(this.state.digitalBank.address, amount).send({ from: this.state.account }).on('transactionHash', (hash) => {
+      this.state.digitalBank.methods.stakeTokens(amount).send({ from: this.state.account }).on('transactionHash', (hash) => {
         this.setState({ loading: false })
       })
     })
   }
 
-  tipImageOwner = (id, amount) => {
+  unstakeTokens = (amount) => {
     this.setState({ loading: true })
-    this.state.decentragram.methods.tipImageOwner(id).send({ from: this.state.account, value: amount }).on("transactionHash", (hash) => {
+    this.state.digitalBank.methods.unstakeTokens().send({ from: this.state.account }).on('transactionHash', (hash) => {
       this.setState({ loading: false })
     })
   }
+
   constructor(props) {
     super(props)
     this.state = {
-      account: '',
-      decentragram: null,
-      images: [],
+      account: '0x0',
+      daiToken: {},
+      prakToken: {},
+      digitalBank: {},
+      daiTokenBalance: '0',
+      prakTokenBalance: '0',
+      stakeBalance: '0',
       loading: true
     }
   }
 
   render() {
+    let content
+    if (this.state.loading) {
+      content = <p id="loader" className="text-center">Loading...</p>
+    } else {
+      content = <Main
+        daiTokenBalance={this.state.daiTokenBalance}
+        prakTokenBalance={this.state.prakTokenBalance}
+        stakeBalance={this.state.stakeBalance}
+        stakeTokens={this.stakeTokens}
+        unstakeTokens={this.unstakeTokens}
+      />
+    }
+
     return (
       <div>
         <Navbar account={this.state.account} />
-        {this.state.loading
-          ? <div id="loader" className="text-center mt-5"><p>Loading...</p></div>
-          : <Main
-            images={this.state.images}
-            captureFile={this.captureFile}
-            uploadImage={this.uploadImage}
-            tipImageOwner={this.tipImageOwner}
-          />
-        }
+        <div className="container-fluid mt-5">
+          <div className="row">
+            <main role="main" className="col-lg-12 ml-auto mr-auto" style={{ maxWidth: '600px' }}>
+              <div className="content mr-auto ml-auto">
+                <a
+                  href="http://www.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                </a>
+
+                {content}
+
+              </div>
+            </main>
+          </div>
+        </div>
       </div>
     );
   }

@@ -1,75 +1,72 @@
-import React, { Component } from 'react';
-import Identicon from 'identicon.js';
+import React, { Component } from 'react'
+import dai from '../dai.png'
 
 class Main extends Component {
 
   render() {
     return (
-      <div className="container-fluid mt-5">
-        <div className="row">
-          <main role="main" className="col-lg-12 ml-auto mr-auto" style={{ maxWidth: '500px' }}>
-            <div className="content mr-auto ml-auto">
-              <p>&nbsp;</p>
-              <h2>Share Image</h2>
-              <form onSubmit={(event) => {
-                event.preventDefault()
-                const description = this.description.value
-                this.props.uploadImage(description)
-              }}>
-                <input type='file' accept='.jpg, .jpeg, .png, .bmp, .gif' onChange={this.props.captureFile} />
-                <div className='form-group mr-sm-2'>
-                  <br></br>
-                  <input id='description' type="text" ref={(input) => { this.description = input }}
-                    className="form-control"
-                    placeholder='Image Description...'
-                    required />
-                </div>
-                <button type='Submit' className='btn btn-primary btn-block btn-lg'>Upload</button>
-              </form>
-              <p>&nbsp;</p>
+      <div id="content" className="mt-3">
 
-              {this.props.images.map((image, key) => {
-                return (
-                  <div className="card mb-4" key={key} >
-                    <div className="card-header">
-                      <img
-                        className='mr-2'
-                        width='30'
-                        height='30'
-                        src={`data:image/png;base64,${new Identicon(image.creator, 30).toString()}`}
-                      />
-                      <small className="text-muted">{image.creator}</small>
-                    </div>
-                    <ul id="imageList" className="list-group list-group-flush">
-                      <li className="list-group-item">
+        <table className="table table-borderless text-muted text-center">
+          <thead>
+            <tr>
+              <th scope="col">Staking Balance</th>
+              <th scope="col">Reward Balance</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{window.web3.utils.fromWei(this.props.stakeBalance, 'Ether')} Dai</td>
+              <td>{window.web3.utils.fromWei(this.props.prakTokenBalance, 'Ether')} DAPP</td>
+            </tr>
+          </tbody>
+        </table>
 
-                        <p className="text-center"><img src={`https://ipfs.infura.io/ipfs/${image.hash}`} style={{ maxWidth: '420px' }} /></p>
-                        <p>{image.description}</p>
-                      </li>
-                      <li key={key} className="list-group-item py-2">
-                        <small className="float-left mt-1 text-muted">
-                          TIPS: {window.web3.utils.fromWei(image.amount.toString(), 'Ether')} ETH
-                        </small>
-                        <button
-                          className="btn btn-link btn-sm float-right pt-0"
-                          name={image.id}
-                          onClick={(event) => {
-                            let amount = window.web3.utils.toWei('0.1', 'Ether')
-                            console.log(event.target.name, amount)
-                            this.props.tipImageOwner(event.target.name, amount)
-                          }}
-                        >
-                          TIP 0.1 ETH
-                        </button>
-                      </li>
-                    </ul>
+        <div className="card mb-4" >
+
+          <div className="card-body">
+
+            <form className="mb-3" onSubmit={(event) => {
+              event.preventDefault()
+              let amount
+              amount = this.input.value.toString()
+              amount = window.web3.utils.toWei(amount, 'Ether')
+              this.props.stakeTokens(amount)
+            }}>
+              <div>
+                <label className="float-left"><b>Stake Tokens</b></label>
+                <span className="float-right text-muted">
+                  Balance: {window.web3.utils.fromWei(this.props.daiTokenBalance, 'Ether')}
+                </span>
+              </div>
+              <div className="input-group mb-4">
+                <input
+                  type="text"
+                  ref={(input) => { this.input = input }}
+                  className="form-control form-control-lg"
+                  placeholder="0"
+                  required />
+                <div className="input-group-append">
+                  <div className="input-group-text">
+                    <img src={dai} height='32' alt="" />
+                    &nbsp;&nbsp;&nbsp; Dai
                   </div>
-                )
-              })}
-
-            </div>
-          </main>
+                </div>
+              </div>
+              <button type="submit" className="btn btn-primary btn-block btn-lg">STAKE!</button>
+            </form>
+            <button
+              type="submit"
+              className="btn btn-link btn-block btn-sm"
+              onClick={(event) => {
+                event.preventDefault()
+                this.props.unstakeTokens()
+              }}>
+              UN-STAKE...
+            </button>
+          </div>
         </div>
+
       </div>
     );
   }
